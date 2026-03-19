@@ -166,7 +166,6 @@
             box-shadow: 0 20px 60px rgba(255, 105, 180, 0.7);
         }
 
-        /* Image preview in upload area */
         #image-preview {
             position: absolute;
             top: 0;
@@ -202,9 +201,6 @@
                 inset 0 0 20px rgba(255, 255, 255, 0.2);
             text-transform: uppercase;
             letter-spacing: 2px;
-            position: relative;
-            overflow: hidden;
-            z-index: 3;
             opacity: 0.5;
             pointer-events: none;
         }
@@ -221,56 +217,49 @@
                 inset 0 0 30px rgba(255, 255, 255, 0.3);
         }
 
-        /* Fullscreen container - FIXED: now properly sized */
-        #fullscreen-container {
+        /* DEDICATED FULLSCREEN IMAGE CONTAINER - ONLY the image + black background */
+        #sigma-fullscreen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: black;
+            background: #000;
             display: flex;
             align-items: center;
             justify-content: center;
+            z-index: 9999;
             opacity: 0;
             visibility: hidden;
-            z-index: 10000;
-            transition: opacity 0.3s ease;
+            transition: all 0.3s ease;
+            cursor: pointer;
         }
 
-        #fullscreen-container.show {
+        #sigma-fullscreen.show {
             opacity: 1;
             visibility: visible;
         }
 
-        #fs-image {
-            max-width: 100vw;
-            max-height: 100vh;
+        #sigma-image {
+            max-width: 98vw;
+            max-height: 98vh;
             width: auto;
             height: auto;
             object-fit: contain;
-            cursor: zoom-out;
+            cursor: pointer;
         }
 
-        /* Fullscreen API styles - now properly fills screen */
-        #fullscreen-container:fullscreen,
-        #fullscreen-container:-webkit-full-screen,
-        #fullscreen-container:-moz-full-screen,
-        #fullscreen-container:-ms-fullscreen {
-            width: 100vw !important;
-            height: 100vh !important;
+        /* Fullscreen API styles for the image container */
+        #sigma-fullscreen:fullscreen,
+        #sigma-fullscreen:-webkit-full-screen {
             opacity: 1 !important;
             visibility: visible !important;
         }
 
-        #fullscreen-container:fullscreen #fs-image,
-        #fullscreen-container:-webkit-full-screen #fs-image,
-        #fullscreen-container:-moz-full-screen #fs-image,
-        #fullscreen-container:-ms-fullscreen #fs-image {
-            width: 100vw !important;
-            height: 100vh !important;
-            max-width: none !important;
-            max-height: none !important;
+        #sigma-fullscreen:fullscreen #sigma-image,
+        #sigma-fullscreen:-webkit-full-screen #sigma-image {
+            max-width: 100vw !important;
+            max-height: 100vh !important;
             object-fit: contain !important;
         }
     </style>
@@ -297,21 +286,21 @@
     <!-- FULL SIGMA BUTTON -->
     <button id="fullSigmaBtn" class="full-sigma-btn" disabled>FULL SIGMA</button>
 
-    <!-- Fullscreen container - NOW properly sized at 100vw x 100vh -->
-    <div id="fullscreen-container">
-        <img id="fs-image" src="" alt="Fullscreen image">
+    <!-- DEDICATED FULLSCREEN IMAGE ONLY -->
+    <div id="sigma-fullscreen">
+        <img id="sigma-image" src="" alt="Sigma Fullscreen">
     </div>
 
     <script>
         const uploadArea = document.getElementById('uploadArea');
         const imagePreview = document.getElementById('image-preview');
         const fullSigmaBtn = document.getElementById('fullSigmaBtn');
-        const fullscreenContainer = document.getElementById('fullscreen-container');
-        const fsImage = document.getElementById('fs-image');
+        const sigmaFullscreen = document.getElementById('sigma-fullscreen');
+        const sigmaImage = document.getElementById('sigma-image');
 
         let currentImageSrc = '';
 
-        // Drag and drop
+        // Drag and drop handlers
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             uploadArea.addEventListener(eventName, preventDefaults, false);
         });
@@ -329,11 +318,9 @@
             uploadArea.addEventListener(eventName, () => uploadArea.classList.remove('drag-over'), false);
         });
 
-        uploadArea.addEventListener('drop', (e) => {
-            handleFiles(e.dataTransfer.files);
-        });
+        uploadArea.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 
-        // Upload via click/browse
+        // File upload
         uploadArea.addEventListener('click', (e) => {
             if (e.target === imagePreview && imagePreview.classList.contains('show')) return;
             const input = document.createElement('input');
@@ -361,9 +348,8 @@
                         currentImageSrc = e.target.result;
                         imagePreview.src = currentImageSrc;
                         imagePreview.classList.add('show');
-                        fsImage.src = currentImageSrc;
+                        sigmaImage.src = currentImageSrc;
                         
-                        // Enable FULL SIGMA button
                         fullSigmaBtn.disabled = false;
                         fullSigmaBtn.classList.add('active');
                     };
@@ -372,49 +358,41 @@
             }
         }
 
-        // FULL SIGMA BUTTON - Try fullscreen FIRST, fallback to overlay
+        // FULL SIGMA BUTTON - Clean image-only fullscreen
         fullSigmaBtn.addEventListener('click', async () => {
             if (!currentImageSrc) return;
 
-            // Try native fullscreen first
+            // First try native fullscreen on image container
             try {
-                if (fullscreenContainer.requestFullscreen) {
-                    await fullscreenContainer.requestFullscreen();
-                } else if (fullscreenContainer.webkitRequestFullscreen) {
-                    await fullscreenContainer.webkitRequestFullscreen();
-                } else if (fullscreenContainer.msRequestFullscreen) {
-                    fullscreenContainer.msRequestFullscreen();
-                } else {
-                    throw new Error('No fullscreen support');
+                if (sigmaFullscreen.requestFullscreen) {
+                    await sigmaFullscreen.requestFullscreen();
+                } else if (sigmaFullscreen.webkitRequestFullscreen) {
+                    await sigmaFullscreen.webkitRequestFullscreen();
                 }
+                return; // Success - let fullscreen handle it
             } catch (err) {
-                console.log('Native fullscreen failed, using overlay:', err);
-                // Fallback: show full overlay
-                fullscreenContainer.classList.add('show');
-                document.body.style.overflow = 'hidden';
+                console.log('Native fullscreen blocked, using overlay');
             }
+
+            // Fallback: show overlay
+            sigmaFullscreen.classList.add('show');
+            document.body.style.overflow = 'hidden';
         });
 
-        // Close fullscreen overlay (click to exit)
-        fullscreenContainer.addEventListener('click', () => {
-            fullscreenContainer.classList.remove('show');
+        // Exit fullscreen (click anywhere or ESC)
+        sigmaFullscreen.addEventListener('click', () => {
+            sigmaFullscreen.classList.remove('show');
             document.body.style.overflow = '';
             
-            // Exit native fullscreen too
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            }
+            if (document.exitFullscreen) document.exitFullscreen();
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
         });
 
-        // ESC key exits fullscreen
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && fullscreenContainer.classList.contains('show')) {
-                fullscreenContainer.classList.remove('show');
+            if (e.key === 'Escape' && sigmaFullscreen.classList.contains('show')) {
+                sigmaFullscreen.classList.remove('show');
                 document.body.style.overflow = '';
+                if (document.exitFullscreen) document.exitFullscreen();
             }
         });
     </script>
