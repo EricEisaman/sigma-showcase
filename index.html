@@ -185,7 +185,7 @@
             opacity: 1;
         }
 
-        /* FULL SIGMA BUTTON - Prominent, dedicated fullscreen trigger */
+        /* FULL SIGMA BUTTON */
         .full-sigma-btn {
             margin-top: 2rem;
             padding: 1.5rem 4rem;
@@ -221,21 +221,46 @@
                 inset 0 0 30px rgba(255, 255, 255, 0.3);
         }
 
-        .full-sigma-btn:active {
-            transform: scale(0.98);
+        /* Fullscreen container - FIXED: now properly sized */
+        #fullscreen-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 10000;
+            transition: opacity 0.3s ease;
         }
 
-        /* Fullscreen styles */
+        #fullscreen-container.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #fs-image {
+            max-width: 100vw;
+            max-height: 100vh;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            cursor: zoom-out;
+        }
+
+        /* Fullscreen API styles - now properly fills screen */
         #fullscreen-container:fullscreen,
         #fullscreen-container:-webkit-full-screen,
         #fullscreen-container:-moz-full-screen,
         #fullscreen-container:-ms-fullscreen {
             width: 100vw !important;
             height: 100vh !important;
-            background: black !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
+            opacity: 1 !important;
+            visibility: visible !important;
         }
 
         #fullscreen-container:fullscreen #fs-image,
@@ -244,8 +269,9 @@
         #fullscreen-container:-ms-fullscreen #fs-image {
             width: 100vw !important;
             height: 100vh !important;
+            max-width: none !important;
+            max-height: none !important;
             object-fit: contain !important;
-            object-position: center !important;
         }
     </style>
 </head>
@@ -271,8 +297,8 @@
     <!-- FULL SIGMA BUTTON -->
     <button id="fullSigmaBtn" class="full-sigma-btn" disabled>FULL SIGMA</button>
 
-    <!-- Fullscreen container (this goes fullscreen) -->
-    <div id="fullscreen-container" style="position: absolute; top: 0; left: 0; width: 0; height: 0; overflow: hidden;">
+    <!-- Fullscreen container - NOW properly sized at 100vw x 100vh -->
+    <div id="fullscreen-container">
         <img id="fs-image" src="" alt="Fullscreen image">
     </div>
 
@@ -346,41 +372,51 @@
             }
         }
 
-        // FULL SIGMA BUTTON - Direct fullscreen trigger
+        // FULL SIGMA BUTTON - Try fullscreen FIRST, fallback to overlay
         fullSigmaBtn.addEventListener('click', async () => {
             if (!currentImageSrc) return;
 
+            // Try native fullscreen first
             try {
-                // Try all vendor prefixes for maximum compatibility
                 if (fullscreenContainer.requestFullscreen) {
                     await fullscreenContainer.requestFullscreen();
                 } else if (fullscreenContainer.webkitRequestFullscreen) {
                     await fullscreenContainer.webkitRequestFullscreen();
                 } else if (fullscreenContainer.msRequestFullscreen) {
-                    await fullscreenContainer.msRequestFullscreen();
-                } else if (document.documentElement.requestFullscreen) {
-                    await document.documentElement.requestFullscreen();
+                    fullscreenContainer.msRequestFullscreen();
+                } else {
+                    throw new Error('No fullscreen support');
                 }
             } catch (err) {
-                console.log('Fullscreen failed:', err);
-                // Fallback: alert user
-                alert('Fullscreen blocked by browser. Try F11 or check browser settings.');
+                console.log('Native fullscreen failed, using overlay:', err);
+                // Fallback: show full overlay
+                fullscreenContainer.classList.add('show');
+                document.body.style.overflow = 'hidden';
             }
         });
 
-        // Handle fullscreen change
-        document.addEventListener('fullscreenchange', updateFullscreenStyles);
-        document.addEventListener('webkitfullscreenchange', updateFullscreenStyles);
-        document.addEventListener('mozfullscreenchange', updateFullscreenStyles);
-        document.addEventListener('MSFullscreenChange', updateFullscreenStyles);
-
-        function updateFullscreenStyles() {
-            if (!document.fullscreenElement && !document.webkitFullscreenElement && 
-                !document.mozFullScreenElement && !document.msFullscreenElement) {
-                // Exited fullscreen
-                console.log('Exited fullscreen');
+        // Close fullscreen overlay (click to exit)
+        fullscreenContainer.addEventListener('click', () => {
+            fullscreenContainer.classList.remove('show');
+            document.body.style.overflow = '';
+            
+            // Exit native fullscreen too
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
             }
-        }
+        });
+
+        // ESC key exits fullscreen
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && fullscreenContainer.classList.contains('show')) {
+                fullscreenContainer.classList.remove('show');
+                document.body.style.overflow = '';
+            }
+        });
     </script>
 </body>
 </html>
